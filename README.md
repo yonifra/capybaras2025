@@ -10,7 +10,7 @@ The 2025 FLL Challenge, titled "Unearthed," focuses on the theme of earth scienc
 
 ## Our Team
 
-We are the Capybaras, a passionate group of young innovators committed to making a positive impact through STEM education. Our team consists of members with diverse skills in robotics, programming, research, and project management.
+We are the Capybaras, a passionate group of young innovators from Kfar Saba, Israel, committed to making a positive impact through STEM education. Our team consists of members with diverse skills in robotics, programming, research, and project management.
 
 ## Project Overview
 
