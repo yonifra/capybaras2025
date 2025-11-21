@@ -20,7 +20,7 @@ async def move_tank_for_cm (move_cm, speed_per):
     '''
     # Convert input speed (percentage 0-100%) to Hub velocity (degrees/second, usually max 1000)
     # 50% is roughly 500 deg/s
-    hub_velocity = int(speed_per * 10 + 1)
+    hub_velocity = int(speed_per * 10)
 
     # Convert cm to degrees
     degrees_to_move = cm_to_degrees(move_cm)
