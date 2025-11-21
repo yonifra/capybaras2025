@@ -1,6 +1,5 @@
 ## Here the code for the Robot will be implemented
-print("Robot code goes here")
-print("hello")
+
 from hub import light_matrix, port
 import runloop, motor_pair, sys, math
 
