@@ -115,7 +115,7 @@ async def rotate(degrees, speed_percentage=30):
     )
 
 
-async def move_tank_for_cm(move_cm, speed_per):
+async def move_tank_for_cm(move_cm, speed_per=10):
     """Drives the robot a specified distance in centimeters at a given % speed (0-100%).
     parameter move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
     parameter speed_per: The speed as a percentage (0 to 100%).
@@ -147,9 +147,9 @@ async def move_tank_for_cm(move_cm, speed_per):
 async def mission_one_and_two():
     print("--- Starting Mission 1+2 ---")
     # Move forward 50 cm
-    # await move_tank_for_cm(50, 50)
+    await move_tank_for_cm(50, 50)
     # Example: Rotate 90 degrees clockwise
-    await rotate(90, 30)
+    await rotate(90)
     # arm function here...
 
 
