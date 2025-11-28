@@ -1,6 +1,7 @@
 ## Here the code for the Robot will be implemented
 
 from hub import light_matrix, port, motion_sensor
+import motor
 import runloop, motor_pair, sys, math
 
 # Constants
@@ -49,8 +50,9 @@ async def rotate(degrees, speed_per=30):
         current_angle = abs(motion_sensor.tilt_angles()[0] / 10)
         remaining_angle = target_angle - current_angle
 
-        # Check if target reached
-        if remaining_angle <= 0:
+        # Check if target reached - stop motors before breaking
+        if remaining_angle <= 1:
+            motor_pair.stop(motor_pair.PAIR_1, motor.BREAK)
             break
 
         # Calculate speed with easing
@@ -80,73 +82,12 @@ async def rotate(degrees, speed_per=30):
         motor_pair.move_tank(motor_pair.PAIR_1, left_speed, right_speed)
         await runloop.sleep_ms(10)
 
-    # Stop the motors with brake
-    motor_pair.stop(motor_pair.PAIR_1, brake=True)
-    await runloop.sleep_ms(100)  # Allow robot to settle
-
-    # Check for overshoot and compensate if necessary
-    final_yaw = motion_sensor.tilt_angles()[0] / 10
-    error = target_angle - abs(final_yaw)
-
-    # Tolerance for acceptable error (degrees)
-    tolerance = 1.0
-
-    print("[ROTATE] Initial stop - Yaw:", final_yaw, "degrees, Error:", round(error, 2), "degrees")
-
-    # If we overshot or undershot significantly, compensate
-    if abs(error) > tolerance:
-        print("[ROTATE] Compensating for error...")
-
-        # Determine correction direction
-        # Positive error means we need to continue rotating
-        # Negative error means we overshot and need to rotate back
-        if error > 0:
-            # Undershot - continue in same direction
-            correction_clockwise = clockwise
-        else:
-            # Overshot - reverse direction
-            correction_clockwise = not clockwise
-            error = abs(error)  # Make error positive for calculation
-
-        # Use slow speed for correction
-        correction_speed = max(min_motor_speed, int(error * 20))
-        correction_speed = min(correction_speed, int(max_motor_speed * 0.4))  # Cap at 40% of max
-
-        # Apply correction with equal speeds for in-place rotation
-        correction_start_time = 0
-        max_correction_time = 2000  # Maximum 2 seconds for correction
-
-        while abs(error) > tolerance and correction_start_time < max_correction_time:
-            current_yaw = abs(motion_sensor.tilt_angles()[0] / 10)
-            error = target_angle - current_yaw
-
-            # Recalculate if we need to change direction
-            if (error > 0 and not correction_clockwise) or (error < 0 and correction_clockwise):
-                # Direction needs to flip
-                correction_clockwise = not correction_clockwise
-                error = abs(error)
-
-            # Apply correction rotation with equal speeds
-            if correction_clockwise:
-                left_speed = correction_speed
-                right_speed = -correction_speed
-            else:
-                left_speed = -correction_speed
-                right_speed = correction_speed
-
-            motor_pair.move_tank(motor_pair.PAIR_1, left_speed, right_speed)
-            await runloop.sleep_ms(10)
-            correction_start_time += 10
-
-        # Stop after correction
-        motor_pair.stop(motor_pair.PAIR_1, brake=True)
-        await runloop.sleep_ms(50)
-
-        final_yaw = motion_sensor.tilt_angles()[0] / 10
-        error = target_angle - abs(final_yaw)
-        print("[ROTATE] After compensation - Yaw:", final_yaw, "degrees, Error:", round(error, 2), "degrees")
+    # Motors already stopped in loop, just wait for robot to settle
+    await runloop.sleep_ms(100)
 
     # Print final yaw value for debugging
+    final_yaw = motion_sensor.tilt_angles()[0] / 10
+    error = target_angle - abs(final_yaw)
     print("[ROTATE END] Final yaw:", final_yaw, "degrees, Target was:", degrees, "degrees, Error:", round(error, 2), "degrees")
 
 async def move_tank_for_cm(move_cm, speed_per):
@@ -172,7 +113,7 @@ async def move_tank_for_cm(move_cm, speed_per):
     # Move the robot straight in the degrees and velocity required
     await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, degrees_to_move, hub_velocity, hub_velocity)
     # Stops the motors
-    motor_pair.stop(motor_pair.PAIR_1)
+    motor_pair.stop(motor_pair.PAIR_1, motor.BREAK)
 
 # This is how to write the missions code. After writing the code, run it at the main function.
 async def mission_one_and_two():
