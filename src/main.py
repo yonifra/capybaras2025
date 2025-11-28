@@ -5,6 +5,8 @@ import runloop, motor_pair, sys, math
 
 # Constants
 WHEEL_CIRCUMFERENCE = 27.6  # Verify with current wheel
+WHEEL_BASE = 11.5  # Distance between left and right wheels in cm
+CENTER_OFFSET = -4.0  # Distance from wheel axle to robot's center of mass in cm (forward)
 
 # Pair the motors connected to ports D (Left) and C (Right) as PAIR_1
 motor_pair.pair(motor_pair.PAIR_1, port.D, port.C)
@@ -20,8 +22,13 @@ async def rotate(degrees, speed_per=30):
        parameter degrees: The angle to rotate in degrees. Positive for clockwise, negative for counter-clockwise.
        parameter speed_per: The speed as a percentage (0 to 100%). Default is 30%.
     '''
+    # Print initial yaw value before reset
+    initial_yaw = motion_sensor.tilt_angles()[0] / 10
+    print("[ROTATE START] Initial yaw:", initial_yaw, "degrees, Target:", degrees, "degrees")
+
     # Reset the gyro sensor
     motion_sensor.reset_yaw(0)
+    await runloop.sleep_ms(50)  # Allow sensor to stabilize after reset
 
     # Convert speed percentage to motor velocity
     max_motor_speed = int(speed_per * 10)
@@ -30,6 +37,9 @@ async def rotate(degrees, speed_per=30):
     # Determine rotation direction
     clockwise = degrees > 0
     target_angle = abs(degrees)
+
+    # For in-place rotation, both wheels must move at the same speed in opposite directions
+    # This rotates the robot around the midpoint between the two wheels
 
     # Easing parameters (in degrees)
     ease_in_angle = min(15, target_angle * 0.2)   # Accelerate for first 15° or 20% of turn
@@ -47,29 +57,97 @@ async def rotate(degrees, speed_per=30):
         if current_angle < ease_in_angle:
             # Ease in: gradually increase speed
             progress = current_angle / ease_in_angle
-            motor_speed = int(min_motor_speed + (max_motor_speed - min_motor_speed) * progress)
+            base_motor_speed = int(min_motor_speed + (max_motor_speed - min_motor_speed) * progress)
         elif remaining_angle < ease_out_angle:
             # Ease out: gradually decrease speed
             progress = remaining_angle / ease_out_angle
-            motor_speed = int(min_motor_speed + (max_motor_speed - min_motor_speed) * progress)
+            base_motor_speed = int(min_motor_speed + (max_motor_speed - min_motor_speed) * progress)
         else:
             # Full speed in the middle
-            motor_speed = max_motor_speed
+            base_motor_speed = max_motor_speed
 
-        # Apply direction
+        # Apply equal speeds in opposite directions for in-place rotation
         if clockwise:
-            left_speed = motor_speed
-            right_speed = -motor_speed
+            # Clockwise: left forward, right backward
+            left_speed = base_motor_speed
+            right_speed = -base_motor_speed
         else:
-            left_speed = -motor_speed
-            right_speed = motor_speed
+            # Counter-clockwise: left backward, right forward
+            left_speed = -base_motor_speed
+            right_speed = base_motor_speed
 
         # Move with current speed
         motor_pair.move_tank(motor_pair.PAIR_1, left_speed, right_speed)
         await runloop.sleep_ms(10)
 
-    # Stop the motors
-    motor_pair.stop(motor_pair.PAIR_1)
+    # Stop the motors with brake
+    motor_pair.stop(motor_pair.PAIR_1, brake=True)
+    await runloop.sleep_ms(100)  # Allow robot to settle
+
+    # Check for overshoot and compensate if necessary
+    final_yaw = motion_sensor.tilt_angles()[0] / 10
+    error = target_angle - abs(final_yaw)
+
+    # Tolerance for acceptable error (degrees)
+    tolerance = 1.0
+
+    print("[ROTATE] Initial stop - Yaw:", final_yaw, "degrees, Error:", round(error, 2), "degrees")
+
+    # If we overshot or undershot significantly, compensate
+    if abs(error) > tolerance:
+        print("[ROTATE] Compensating for error...")
+
+        # Determine correction direction
+        # Positive error means we need to continue rotating
+        # Negative error means we overshot and need to rotate back
+        if error > 0:
+            # Undershot - continue in same direction
+            correction_clockwise = clockwise
+        else:
+            # Overshot - reverse direction
+            correction_clockwise = not clockwise
+            error = abs(error)  # Make error positive for calculation
+
+        # Use slow speed for correction
+        correction_speed = max(min_motor_speed, int(error * 20))
+        correction_speed = min(correction_speed, int(max_motor_speed * 0.4))  # Cap at 40% of max
+
+        # Apply correction with equal speeds for in-place rotation
+        correction_start_time = 0
+        max_correction_time = 2000  # Maximum 2 seconds for correction
+
+        while abs(error) > tolerance and correction_start_time < max_correction_time:
+            current_yaw = abs(motion_sensor.tilt_angles()[0] / 10)
+            error = target_angle - current_yaw
+
+            # Recalculate if we need to change direction
+            if (error > 0 and not correction_clockwise) or (error < 0 and correction_clockwise):
+                # Direction needs to flip
+                correction_clockwise = not correction_clockwise
+                error = abs(error)
+
+            # Apply correction rotation with equal speeds
+            if correction_clockwise:
+                left_speed = correction_speed
+                right_speed = -correction_speed
+            else:
+                left_speed = -correction_speed
+                right_speed = correction_speed
+
+            motor_pair.move_tank(motor_pair.PAIR_1, left_speed, right_speed)
+            await runloop.sleep_ms(10)
+            correction_start_time += 10
+
+        # Stop after correction
+        motor_pair.stop(motor_pair.PAIR_1, brake=True)
+        await runloop.sleep_ms(50)
+
+        final_yaw = motion_sensor.tilt_angles()[0] / 10
+        error = target_angle - abs(final_yaw)
+        print("[ROTATE] After compensation - Yaw:", final_yaw, "degrees, Error:", round(error, 2), "degrees")
+
+    # Print final yaw value for debugging
+    print("[ROTATE END] Final yaw:", final_yaw, "degrees, Target was:", degrees, "degrees, Error:", round(error, 2), "degrees")
 
 async def move_tank_for_cm(move_cm, speed_per):
     '''Drives the robot a specified distance in centimeters at a given % speed (0-100%).
