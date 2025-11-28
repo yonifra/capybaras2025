@@ -1,7 +1,10 @@
 ## Here the code for the Robot will be implemented
 
-from hub import light_matrix, port
+from hub import light_matrix, port, motion_sensor
 import runloop, motor_pair, sys, math
+
+# Constants
+WHEEL_CIRCUMFERENCE = 27.6  # Verify with current wheel
 
 # Pair the motors connected to ports D (Left) and C (Right) as PAIR_1
 motor_pair.pair(motor_pair.PAIR_1, port.D, port.C)
@@ -10,10 +13,65 @@ motor_pair.pair(motor_pair.PAIR_1, port.D, port.C)
 def cm_to_degrees(distance_cm):
     # Calculate the number of degrees needed for the given distance
     # (distance / circumference) * 360 degrees per rotation
-    WHEEL_CIRCUMFERENCE = 27.6 # Verify with current wheel
     return (abs(distance_cm) / WHEEL_CIRCUMFERENCE) * 360
 
-async def move_tank_for_cm (move_cm, speed_per):
+async def rotate(degrees, speed_per=30):
+    '''Rotates the robot by a specified angle using the gyro sensor with easing.
+       parameter degrees: The angle to rotate in degrees. Positive for clockwise, negative for counter-clockwise.
+       parameter speed_per: The speed as a percentage (0 to 100%). Default is 30%.
+    '''
+    # Reset the gyro sensor
+    motion_sensor.reset_yaw(0)
+
+    # Convert speed percentage to motor velocity
+    max_motor_speed = int(speed_per * 10)
+    min_motor_speed = int(max_motor_speed * 0.2)  # Start at 20% of max speed
+
+    # Determine rotation direction
+    clockwise = degrees > 0
+    target_angle = abs(degrees)
+
+    # Easing parameters (in degrees)
+    ease_in_angle = min(15, target_angle * 0.2)   # Accelerate for first 15° or 20% of turn
+    ease_out_angle = min(20, target_angle * 0.3)  # Decelerate for last 20° or 30% of turn
+
+    while True:
+        current_angle = abs(motion_sensor.tilt_angles()[0] / 10)
+        remaining_angle = target_angle - current_angle
+
+        # Check if target reached
+        if remaining_angle <= 0:
+            break
+
+        # Calculate speed with easing
+        if current_angle < ease_in_angle:
+            # Ease in: gradually increase speed
+            progress = current_angle / ease_in_angle
+            motor_speed = int(min_motor_speed + (max_motor_speed - min_motor_speed) * progress)
+        elif remaining_angle < ease_out_angle:
+            # Ease out: gradually decrease speed
+            progress = remaining_angle / ease_out_angle
+            motor_speed = int(min_motor_speed + (max_motor_speed - min_motor_speed) * progress)
+        else:
+            # Full speed in the middle
+            motor_speed = max_motor_speed
+
+        # Apply direction
+        if clockwise:
+            left_speed = motor_speed
+            right_speed = -motor_speed
+        else:
+            left_speed = -motor_speed
+            right_speed = motor_speed
+
+        # Move with current speed
+        motor_pair.move_tank(motor_pair.PAIR_1, left_speed, right_speed)
+        await runloop.sleep_ms(10)
+
+    # Stop the motors
+    motor_pair.stop(motor_pair.PAIR_1)
+
+async def move_tank_for_cm(move_cm, speed_per):
     '''Drives the robot a specified distance in centimeters at a given % speed (0-100%).
        parameter move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
        parameter speed_per: The speed as a percentage (0 to 100%).
@@ -29,28 +87,27 @@ async def move_tank_for_cm (move_cm, speed_per):
     if move_cm < 0:
         hub_velocity = -abs(hub_velocity) # Ensure velocity matches direction sign
     hub_velocity = int(hub_velocity)
-    degrees_to_move=int(degrees_to_move)
-    #Print the calculated movement in beeing prefoemed
-    #print(f"Moving {move_cm} cm at {speed_per}% speed ({degrees_to_move} degrees at {hub_velocity} velocity)")
+    degrees_to_move = int(degrees_to_move)
+    # Print the calculated movement being performed
+    # print(f"Moving {move_cm} cm at {speed_per}% speed ({degrees_to_move} degrees at {hub_velocity} velocity)")
     print(hub_velocity)
-    # Move the robot straight in the degrees and velocity required 
+    # Move the robot straight in the degrees and velocity required
     await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, degrees_to_move, hub_velocity, hub_velocity)
-    #Stops the motors
-    await motor_pair.stop
+    # Stops the motors
+    motor_pair.stop(motor_pair.PAIR_1)
 
-
-
-#This is how to write the missions code. After writing the code, run it at the main function.
+# This is how to write the missions code. After writing the code, run it at the main function.
 async def mission_one_and_two():
     print("--- Starting Mission 1+2 ---")
-    # Move forward 70 cm
-    await move_tank_for_cm (50, 50)
-    # turn function here...
+    # Move forward 50 cm
+    # await move_tank_for_cm(50, 50)
+    # Example: Rotate 90 degrees clockwise
+    await rotate(90, 30)
     # arm function here...
 
 
 async def main():
-    #run mission 1+2
+    # Run mission 1+2
     await mission_one_and_two()
 
 
