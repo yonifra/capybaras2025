@@ -7,9 +7,8 @@ import runloop, motor_pair, sys, math
 # Constants
 WHEEL_CIRCUMFERENCE = 27.6  # Verify with current wheel
 WHEEL_BASE = 11.5  # Distance between left and right wheels in cm
-CENTER_OFFSET = (
-    -4.0
-)  # Distance from wheel axle to robot's center of mass in cm (forward)
+# Distance from wheel axle to robot's center of mass in cm (forward)
+CENTER_OFFSET = -4.0
 
 # Pair the motors connected to ports D (Left) and C (Right) as PAIR_1
 motor_pair.pair(motor_pair.PAIR_1, port.D, port.C)
@@ -22,10 +21,10 @@ def cm_to_degrees(distance_cm):
     return (abs(distance_cm) / WHEEL_CIRCUMFERENCE) * 360
 
 
-async def rotate(degrees, speed_per=30):
+async def rotate(degrees, speed_percentage=30):
     """Rotates the robot by a specified angle using the gyro sensor with easing.
     parameter degrees: The angle to rotate in degrees. Positive for clockwise, negative for counter-clockwise.
-    parameter speed_per: The speed as a percentage (0 to 100%). Default is 30%.
+    parameter speed_percentage: The speed as a percentage (0 to 100%). Default is 30%.
     """
     # Print initial yaw value before reset
     initial_yaw = motion_sensor.tilt_angles()[0] / 10
@@ -42,7 +41,7 @@ async def rotate(degrees, speed_per=30):
     await runloop.sleep_ms(50)  # Allow sensor to stabilize after reset
 
     # Convert speed percentage to motor velocity
-    max_motor_speed = int(speed_per * 10)
+    max_motor_speed = int(speed_percentage * 10)
     min_motor_speed = int(max_motor_speed * 0.2)  # Start at 20% of max speed
 
     # Determine rotation direction
@@ -53,12 +52,11 @@ async def rotate(degrees, speed_per=30):
     # This rotates the robot around the midpoint between the two wheels
 
     # Easing parameters (in degrees)
-    ease_in_angle = min(
-        15, target_angle * 0.2
-    )  # Accelerate for first 15° or 20% of turn
-    ease_out_angle = min(
-        20, target_angle * 0.3
-    )  # Decelerate for last 20° or 30% of turn
+    # Accelerate for first 15° or 20% of turn
+    ease_in_angle = min(15, target_angle * 0.2)
+
+    # Decelerate for last 20° or 30% of turn
+    ease_out_angle = min(20, target_angle * 0.3)
 
     while True:
         current_angle = abs(motion_sensor.tilt_angles()[0] / 10)
