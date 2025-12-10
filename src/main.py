@@ -78,30 +78,77 @@ async def turn_pi(turn_degrees: int, speed: int):
 
 async def move_tank_for_cm(move_cm, speed_per=10):
     """Drives the robot a specified distance in centimeters at a given % speed (0-100%).
+    Uses gyro sensor with PI control to maintain a straight heading.
     parameter move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
     parameter speed_per: The speed as a percentage (0 to 100%).
     """
+    # Wait briefly before starting
+    await runloop.sleep_ms(50)
+
+    # Reset the gyro sensor to 0 for straight-line driving
+    motion_sensor.reset_yaw(0)
+
+    # PI control constants for heading correction
+    kp = 2.0  # Proportional constant - adjusts how aggressively to correct
+    ki = 0.01  # Integral constant - helps eliminate steady-state error
+
     # Convert input speed (percentage 0-100%) to Hub velocity (degrees/second, usually max 1000)
-    # 50% is roughly 500 deg/s
     hub_velocity = int(speed_per * 10)
 
     # Convert cm to degrees
     degrees_to_move = cm_to_degrees(move_cm)
 
-    # If distance is negative, the hub_velocity should also be negative to reverse direction in the move tank for degrees function
-    if move_cm < 0:
-        hub_velocity = -abs(hub_velocity)# Ensure velocity matches direction sign
-    hub_velocity = int(hub_velocity)
-    degrees_to_move = int(degrees_to_move)
-    # Print the calculated movement being performed
-    # print(f"Moving {move_cm} cm at {speed_per}% speed ({degrees_to_move} degrees at {hub_velocity} velocity)")
-    print(hub_velocity)
+    # Determine direction
+    direction = 1 if move_cm >= 0 else -1
 
-    # Move the robot straight in the degrees and velocity required
-    await motor_pair.move_tank_for_degrees(motor_pair.PAIR_1, degrees_to_move, hub_velocity, hub_velocity)
+    # Reset motor encoders to track distance traveled
+    motor.reset_relative_position(port.D, 0)
+    motor.reset_relative_position(port.C, 0)
 
-    # Stops the motors
-    motor_pair.stop(motor_pair.PAIR_1)
+    # Integral term accumulator
+    integral = 0.0
+
+    # Control loop - continue until we've traveled the required distance
+    while True:
+        # Get current encoder positions (average of both wheels)
+        left_pos = abs(motor.relative_position(port.D))
+        right_pos = abs(motor.relative_position(port.C))
+        avg_pos = (left_pos + right_pos) / 2
+
+        # Check if we've traveled far enough
+        if avg_pos >= degrees_to_move:
+            break
+
+        # Get current heading from gyro (in degrees, yaw is in decidegrees)
+        current_yaw = motion_sensor.tilt_angles()[0] / 10
+
+        # Calculate heading error (we want to maintain 0 degrees)
+        error = current_yaw
+
+        # Update integral term
+        integral += error
+
+        # Calculate correction using PI controller
+        correction = int(kp * error + ki * integral)
+
+        # Apply correction to motor velocities
+        # If robot drifts right (positive yaw), slow down right wheel / speed up left
+        # If robot drifts left (negative yaw), slow down left wheel / speed up right
+        left_vel = (hub_velocity - correction) * direction
+        right_vel = (hub_velocity + correction) * direction
+
+        # Clamp velocities to valid range
+        left_vel = max(-1000, min(1000, left_vel))
+        right_vel = max(-1000, min(1000, right_vel))
+
+        # Drive the motors
+        motor_pair.move_tank(motor_pair.PAIR_1, int(left_vel), int(right_vel))
+
+        # Small delay for control loop
+        await runloop.sleep_ms(10)
+
+    # Stop the motors with brake
+    motor_pair.stop(motor_pair.PAIR_1, stop=motor.BRAKE)
 
 
 #פונקציה להזזת המנוע הימני A
