@@ -76,75 +76,83 @@ async def turn_pi(turn_degrees: int, speed: int):
     motor_pair.stop(motor_pair.PAIR_1)
 
 
-async def move_tank_for_cm(move_cm, speed_per=50):
+async def move_tank_for_cm(move_cm, speed_per=10):
+    """Drives the robot a specified distance in centimeters at a given % speed (0-100%).
+    Uses gyro sensor with PI control to maintain a straight heading.
+    parameter move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
+    parameter speed_per: The speed as a percentage (0 to 100%).
     """
-    Drives the robot a specified distance in centimeters using gyro-based correction.
-    Uses a similar approach to turn_pi() for stable, wobble-free straight driving.
-    :param move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
-    :param speed_per: The speed as a percentage (0 to 100%).
-    """
-    # המתנה 0.05 שניות
+    # Wait briefly before starting
     await runloop.sleep_ms(50)
 
-    # איפוס ה-Yaw לנסיעה ישרה
+    # Reset the gyro sensor to 0 for straight-line driving
     motion_sensor.reset_yaw(0)
 
-    # מקדם בקרה - lower value = smoother, less wobble
-    kp: float = 1.5
+    # PI control constants for heading correction
+    kp = 2.0# Proportional constant - adjusts how aggressively to correct
+    ki = 0.01# Integral constant - helps eliminate steady-state error
 
-    # Convert speed percentage to hub velocity
-    base_speed = int(speed_per * 10)
+    # Convert input speed (percentage 0-100%) to Hub velocity (degrees/second, usually max 1000)
+    hub_velocity = int(speed_per * 10)
 
-    # Determine direction: 1 for forward, -1 for backward
-    direction = 1 if move_cm >= 0 else -1
-
-    # Convert cm to degrees for distance tracking
+    # Convert cm to degrees
     degrees_to_move = cm_to_degrees(move_cm)
+
+    # Determine direction
+    direction = 1 if move_cm >= 0 else -1
 
     # Reset motor encoders to track distance traveled
     motor.reset_relative_position(port.D, 0)
     motor.reset_relative_position(port.C, 0)
 
-    # Control loop - לולאת הבקרה
-    while True:
-        # Give the sensor a moment
-        time.sleep_ms(10)
+    # Integral term accumulator
+    integral = 0.0
 
-        # Check distance traveled (average of both wheels)
+    # Control loop - continue until we've traveled the required distance
+    while True:
+        # Get current encoder positions (average of both wheels)
         left_pos = abs(motor.relative_position(port.D))
         right_pos = abs(motor.relative_position(port.C))
         avg_pos = (left_pos + right_pos) / 2
 
-        # Stop if we've traveled far enough
+        # Check if we've traveled far enough
         if avg_pos >= degrees_to_move:
             break
 
-        # Get current yaw - we want to maintain 0 degrees (straight)
-        # Yaw measurement: 1 degree = 10 decidegrees
+        # Get current heading from gyro (in degrees, yaw is in decidegrees)
         current_yaw = motion_sensor.tilt_angles()[0] / 10
 
-        # Calculate correction - how much we've drifted from straight (0 degrees)
-        # חישוב התיקון הנדרש * מקדם הבקרה
-        correction = int(current_yaw * kp)
+        # Calculate heading error (we want to maintain 0 degrees)
+        error = current_yaw
 
-        # Apply base speed with direction
-        Vel_L = base_speed * direction
-        Vel_R = base_speed * direction
+        # Update integral term
+        integral += error
 
-        # Apply correction to maintain heading of 0 degrees
-        # If yaw is positive (drifted right), slow right wheel / speed up left
-        # If yaw is negative (drifted left), slow left wheel / speed up right
-        Vel_L = Vel_L + correction
-        Vel_R = Vel_R - correction
+        # Calculate correction using PI controller
+        correction = int(kp * error + ki * integral)
 
-        # Debug output
-        print('Left Vel:', Vel_L, 'Right Vel:', Vel_R, 'Yaw:', current_yaw, 'Distance:', int(avg_pos), '/', int(degrees_to_move))
+        # Apply correction to motor velocities
+        # If robot drifts right (positive yaw), slow down right wheel / speed up left
+        # If robot drifts left (negative yaw), slow down left wheel / speed up right
+        base_vel = hub_velocity * direction
+        left_vel = base_vel + correction
+        right_vel = base_vel - correction
+       # left_vel = (hub_velocity - correction) * direction
+       # right_vel = (hub_velocity + correction) * direction
+
+        # Clamp velocities to valid range
+        left_vel = max(-1000, min(1000, left_vel))
+        right_vel = max(-1000, min(1000, right_vel))
 
         # Drive the motors
-        motor_pair.move_tank(motor_pair.PAIR_1, Vel_L, Vel_R)
+        motor_pair.move_tank(motor_pair.PAIR_1, int(left_vel), int(right_vel))
 
-    # Stop with brake
-    motor_pair.stop(motor_pair.PAIR_1)
+        # Small delay for control loop
+        await runloop.sleep_ms(10)
+
+    # Stop the motors with brake
+    motor_pair.stop(motor_pair.PAIR_1, stop=motor.BRAKE)
+
 
 
 #פונקציה להזזת המנוע הימני A
@@ -165,21 +173,23 @@ async def turn_left_arm(degrees_turn: int, speed_per: int):
 
 # This is how to write the missions code. After writing the code, run it at the main function.
 async def mission_one_and_two():
+    move_speed = 40
     print("--- Starting Mission 1+2 ---")
     # Move forward 10 cm
-    #await move_tank_for_cm(10, 20)
-    #סיבוב ימינה 90
+    await move_tank_for_cm(-85, move_speed)
     print('Turning Left')
-    await turn_pi(-90, 40)
-
-    print('Turning Right')
-    await turn_pi(90, 40)
-
-    # arm function here...
+    await turn_pi(45, 40)
+    await move_tank_for_cm(-5, move_speed)
+    print("הרמת זרוע ימין")
     await turn_right_arm(90,50)
-    await turn_right_arm(-90,50)
-    await turn_left_arm(-270,50)
-
+    await move_tank_for_cm(5, move_speed)
+    await turn_pi(-45, 40)
+    await move_tank_for_cm(42, move_speed)
+    await turn_pi(90, 40)
+    await turn_left_arm(90,50)
+    await move_tank_for_cm(7, move_speed)
+    await turn_pi(-90, 40)
+    await move_tank_for_cm(50, move_speed)
 
 async def main():
     # הפעל את משימה 1+2
