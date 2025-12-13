@@ -164,28 +164,27 @@ async def turn_left_arm(degrees_turn: int, speed_per: int):
 
 
 # This is how to write the missions code. After writing the code, run it at the main function.
-async def mission_one_and_two():
+async def mission_one_and_two(move_speed=40):
     print("--- Starting Mission 1+2 ---")
     # Move forward 10 cm
-    #await move_tank_for_cm(10, 20)
-    #סיבוב ימינה 90
+    await move_tank_for_cm(-85, move_speed)
     print('Turning Left')
-    await turn_pi(-90, 40)
-
-    print('Turning Right')
-    await turn_pi(90, 40)
-
-    # arm function here...
+    await turn_pi(45, 40)
+    await move_tank_for_cm(-5, move_speed)
+    print("הרמת זרוע ימין")
     await turn_right_arm(90,50)
-    await turn_right_arm(-90,50)
-    await turn_left_arm(-270,50)
-
+    await move_tank_for_cm(5, move_speed)
+    await turn_pi(-45, 40)
+    await move_tank_for_cm(42, move_speed)
+    await turn_pi(90, 40)
+    await turn_left_arm(90,50)
+    await move_tank_for_cm(7, move_speed)
+    await turn_pi(-90, 40)
+    await move_tank_for_cm(50, move_speed)
 
 async def main():
     # הפעל את משימה 1+2
     await mission_one_and_two()
-
-    # הפעל את משימה 3+4
 
 
 runloop.run(main())
