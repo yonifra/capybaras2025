@@ -180,12 +180,47 @@ async def mission_one_and_two():
     await turn_right_arm(-90,50)
     await turn_left_arm(-270,50)
 
+async def mission_three_and_four(): #missions 3+4
+    print("--- Starting Mission 3+4 ---")
+    # Move forward 10 cm
+    #await move_tank_for_cm(-80, 55)
+    #סיבוב ימינה 90
+    #print('Turning Left')
+    #await turn_pi(-90, 40)
+
+    #print('Turning Right')
+
+
+    # arm function here...
+    #await turn_right_arm(90,50)
+    #await turn_right_arm(-90,50)
+    #await turn_left_arm(-270,50)
+    #await turn_pi(-90,40)
+
+    #await move_tank_for_cm(-15, 50)
+
+    #await turn_pi(-45, 40)
+
+    #await move_tank_for_cm(34, 30)
+
+    #await turn_pi(45, 40)
+
+    await move_tank_for_cm(-8, 25)
+    await turn_left_arm(-90, 50)
+    await move_tank_for_cm(-3, 25)
+    await turn_left_arm(200,50)
+
+    #await turn_pi(-2,30)
+
+    await move_tank_for_cm(11.5,20)
+
 
 async def main():
     # הפעל את משימה 1+2
     await mission_one_and_two()
 
     # הפעל את משימה 3+4
+    await mission_three_and_four()
 
 
 runloop.run(main())
