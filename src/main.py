@@ -5,8 +5,8 @@ import motor, motor_pair, time
 import runloop, sys, math
 
 # Constants - קבועים גלובליים בשימוש
-WHEEL_CIRCUMFERENCE = 27.6# לגלגל גדול
-WHEEL_BASE = 11.5# מרחק בין הגלגלים cm
+WHEEL_CIRCUMFERENCE = 17.5 # לגלגל קטן
+WHEEL_BASE = 11.5 # מרחק בין הגלגלים cm
 # Distance from wheel axle to robot's center of mass in cm (forward)
 CENTER_OFFSET = -4.0
 
