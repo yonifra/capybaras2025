@@ -236,12 +236,39 @@ async def mission_three_and_four():  # missions 3+4
     await move_tank_for_cm(11.5, 20)
 
 
+async def mission_ten(move_speed=40, turning_speed=40):
+    print("--- Starting Mission 10 ---")
+
+    # Move forward 15 cm
+    await move_tank_for_cm(-2, move_speed)
+
+    print("Turning Left")
+    await turn_pi(90, turning_speed)
+
+    # Move forward 15 cm
+    await move_tank_for_cm(-35, move_speed)
+
+    print("Turning right")
+    await turn_pi(-90, turning_speed)
+    # מפיל את הכד ותופס את התיבה
+    await move_tank_for_cm(-3, move_speed)
+    await move_tank_for_cm(3, move_speed)
+
+    # להסתובב אחורה חזרה
+    print("Turning right")
+    await turn_pi(-90, turning_speed)
+    await move_tank_for_cm(70, move_speed)
+
+
 async def main():
     # הפעל את משימה 1+2
     await mission_one_and_two()
 
     # הפעל את משימה 3+4
     await mission_three_and_four()
+
+    # הפעל את משימה 10
+    await mission_ten()
 
 
 runloop.run(main())
