@@ -236,6 +236,26 @@ async def mission_three_and_four():  # missions 3+4
     await move_tank_for_cm(11.5, 20)
 
 
+async def mission_eight(move_speed=40, turning_speed=50):
+    print("--- Starting Mission 8 ---")
+
+    await move_tank_for_cm(-40, move_speed)
+
+    # print("הרמת זרוע ימין")
+    await turn_right_arm(90, turning_speed)
+    await turn_right_arm(-90, turning_speed)
+    await turn_right_arm(90, turning_speed)
+    await turn_right_arm(-90, turning_speed)
+    await turn_right_arm(90, turning_speed)
+    await turn_right_arm(-90, turning_speed)
+    await turn_right_arm(90, turning_speed)
+    await turn_right_arm(-90, turning_speed)
+    await turn_right_arm(90, turning_speed)
+    await turn_right_arm(-90, turning_speed)
+
+    await move_tank_for_cm(40, move_speed)
+
+
 async def mission_ten(move_speed=40, turning_speed=40):
     print("--- Starting Mission 10 ---")
 
@@ -266,6 +286,9 @@ async def main():
 
     # הפעל את משימה 3+4
     await mission_three_and_four()
+
+    # הפעל את משימה 8
+    await mission_eight()
 
     # הפעל את משימה 10
     await mission_ten()
