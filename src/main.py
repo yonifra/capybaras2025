@@ -1,6 +1,4 @@
-## קוד לתחרות
-
-from hub import light_matrix, port, motion_sensor, button
+from hub import port, motion_sensor
 import motor, motor_pair, time
 import runloop, sys, math
 
