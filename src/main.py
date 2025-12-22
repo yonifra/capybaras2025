@@ -1,33 +1,43 @@
 from hub import port, motion_sensor
 import motor, motor_pair, time
-import runloop, sys, math
+import runloop
 
 # Constants - קבועים גלובליים בשימוש
-WHEEL_CIRCUMFERENCE = 17.5929  # לגלגל גדול
+WHEEL_CIRCUMFERENCE = 17.5929  # cm - For 56mm diameter wheels (small wheels)
 WHEEL_BASE = 11.5  # מרחק בין הגלגלים cm
-# Distance from wheel axle to robot's center of mass in cm (forward)
-CENTER_OFFSET = -4.0
+
+# PID Constants for turning (tune these values for your robot)
+TURN_KP = 2.0
+TURN_KI = 0.0
+TURN_KD = 0.5
+
+# PID Constants for straight driving
+DRIVE_KP = 0.8
+DRIVE_KI = 0.003
+DRIVE_KD = 0.0
 
 # Pair the motors connected to ports D (Left) and C (Right) as PAIR_1
 motor_pair.pair(motor_pair.PAIR_1, port.D, port.C)
 
 
-# פונקציה שמחזירה כמות מעלות נדרשות בהתאם לכמות הס״מ שהגלגל נסע
-def cm_to_degrees(distance_cm):
-    # Calculate the number of degrees needed for the given distance
-    # (distance / circumference) * 360 degrees per rotation
+def cm_to_degrees(distance_cm: float) -> float:
+    """
+    Convert distance in centimeters to motor degrees.
+
+    :param distance_cm: Distance in centimeters.
+    :return: Number of motor degrees needed to travel that distance.
+    """
     return (abs(distance_cm) / WHEEL_CIRCUMFERENCE) * 360
 
 
-# פונקציה לסיבוב הרובוט עם ג׳יירו
-async def turn_PID(turn_degrees: int, speed=100):
+async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
     """
-    Advanced PID with Shortest Path Logic, Acceleration Ramping, and Safety Timeout.
-    Executes a precise point turn using a Proportional-Integral (PI) controller with yaw feedback.
-    :param turn_degrees: The degrees needed to turn (e.g., 90, -45, 180 degrees).
-    :param kp: The proportional constant (tune this value, start around 1.0 to 3.0).
-    :param ki: The integral constant (tune this value, start around 0.01 to 0.1).
-    :param Kd: The Diffentail constant (Tune this value, Start around 0.2 to 0.9)
+    Precise point turn using PID control with gyro feedback.
+
+    Features: Shortest path logic, acceleration ramping, and safety timeout.
+
+    :param turn_degrees: The degrees to turn (e.g., 90, -45, 180). Positive = clockwise.
+    :param speed: Maximum speed (ramping controls actual speed).
     """
 
     # המתנה 0.05 שניות
@@ -36,10 +46,10 @@ async def turn_PID(turn_degrees: int, speed=100):
     # איפוס ה-Yaw
     motion_sensor.reset_yaw(0)
 
-    # מקדמי בקרה (דורש כיול בהתאם לרובוט שלך)
-    kp = 2  # Proportional: עוצמת התיקון הבסיסית
-    ki = 0.0  # Integral: תיקון הצטברות שגיאה (עוזר להגיע בדיוק לזווית)
-    kd = 0.5  # Derivative: "בלם" למניעת חריגה מהיעד
+    # Use module-level PID constants for easier tuning
+    kp = TURN_KP
+    ki = TURN_KI
+    kd = TURN_KD
     # משתני עזר לבקרה
     integral = 0
     last_error = 0
@@ -57,7 +67,7 @@ async def turn_PID(turn_degrees: int, speed=100):
     start_time = time.ticks_ms()
     timeout_sec = 5
 
-    # Conrtol loop - לולאת הבקרה
+    # Control loop - לולאת הבקרה
     while True:
 
         # Check Timeout (Safety)
@@ -136,20 +146,18 @@ async def turn_PID(turn_degrees: int, speed=100):
         else:
             settle_count = 0
 
-        # עדכון השגיאה האחרונה למחזור הבא
-        last_error = error
         await runloop.sleep_ms(10)  # קצב דגימה קבוע של 100Hz
 
-    motor_pair.stop(motor_pair.PAIR_1)  # עצירת התנועה
+    motor_pair.stop(motor_pair.PAIR_1, stop=motor.BRAKE)  # עצירת התנועה
     await runloop.sleep_ms(10)  # קצב דגימה קבוע של 100Hz
 
 
-async def move_tank_for_cm(move_cm, speed_per=50):
+async def move_tank_for_cm(move_cm: float, speed_per: int = 50) -> None:
     """
-    Drives the robot a specified distance in centimeters using gyro-based correction.
-    Uses a similar approach to turn_PID() for stable, wobble-free straight driving.
-    :param move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
-    :param speed_per: The speed as a percentage (0 to 100%).
+    Drive the robot a specified distance using gyro-based steering correction.
+
+    :param move_cm: Distance in cm. Positive = forward, negative = backward.
+    :param speed_per: Speed as percentage (0-100%).
     """
     # המתנה 0.05 שניות
     await runloop.sleep_ms(50)
@@ -157,10 +165,10 @@ async def move_tank_for_cm(move_cm, speed_per=50):
     # איפוס ה-Yaw לנסיעה ישרה
     motion_sensor.reset_yaw(0)
 
-    # PID Constants for steering (Gyro)
-    kp = 0.8  # How aggressively it returns to straight
-    ki = 0.003  # Fixes slow drifts
-    kd = 0.0  # Prevents "fishtailing" (wobbling)
+    # Use module-level PID constants for easier tuning
+    kp = DRIVE_KP
+    ki = DRIVE_KI
+    kd = DRIVE_KD
 
     # Convert speed percentage to hub velocity
     base_speed = int(speed_per * 10)
@@ -199,8 +207,6 @@ async def move_tank_for_cm(move_cm, speed_per=50):
         current_base_speed = base_speed
         if remaining_dist < 300:  # If less than 300 degrees left
             current_base_speed = max(100, base_speed * (remaining_dist / 300))
-
-        current_yaw = motion_sensor.tilt_angles()[0] / 10
 
         # PID Steering Logic
         # Get current yaw - we want to maintain 0 degrees (straight)
@@ -242,8 +248,7 @@ async def move_tank_for_cm(move_cm, speed_per=50):
         await runloop.sleep_ms(10)
 
     # Stop with brake
-    motor_pair.stop(motor_pair.PAIR_1, stop=motor.HOLD)
-    # motor_pair.stop(motor_pair.PAIR_1)
+    motor_pair.stop(motor_pair.PAIR_1, stop=motor.BRAKE)
     await runloop.sleep_ms(50)
 
 
@@ -288,22 +293,28 @@ async def mission_three_and_four():
     await move_tank_for_cm(11.5, 20)
 
 
-async def mission_eight(move_speed=40, turning_speed=50):
+async def oscillate_arm(arm_func, degrees: int, speed: int, count: int) -> None:
+    """
+    Oscillate an arm motor back and forth a specified number of times.
+
+    :param arm_func: The arm function to call (turn_right_arm or turn_left_arm).
+    :param degrees: The degrees to move in each direction.
+    :param speed: The speed percentage (0-100%).
+    :param count: Number of oscillation cycles.
+    """
+    for _ in range(count):
+        await arm_func(degrees, speed)
+        await arm_func(-degrees, speed)
+
+
+async def mission_eight(move_speed: int = 40, turning_speed: int = 50) -> None:
+    """Mission 8: Move forward, oscillate right arm, return."""
     print("--- Starting Mission 8 ---")
 
     await move_tank_for_cm(-40, move_speed)
 
-    # print("הרמת זרוע ימין")
-    await turn_right_arm(90, turning_speed)
-    await turn_right_arm(-90, turning_speed)
-    await turn_right_arm(90, turning_speed)
-    await turn_right_arm(-90, turning_speed)
-    await turn_right_arm(90, turning_speed)
-    await turn_right_arm(-90, turning_speed)
-    await turn_right_arm(90, turning_speed)
-    await turn_right_arm(-90, turning_speed)
-    await turn_right_arm(90, turning_speed)
-    await turn_right_arm(-90, turning_speed)
+    # Oscillate right arm 10 times
+    await oscillate_arm(turn_right_arm, 90, turning_speed, 10)
 
     await move_tank_for_cm(40, move_speed)
 
