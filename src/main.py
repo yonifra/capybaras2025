@@ -1,43 +1,37 @@
-from hub import port, motion_sensor
+from hub import light_matrix, port, motion_sensor, button
 import motor, motor_pair, time
-import runloop
+import runloop, sys, math
 
 # Constants - קבועים גלובליים בשימוש
-WHEEL_CIRCUMFERENCE = 17.5929  # cm - For 56mm diameter wheels (small wheels)
+WHEEL_CIRCUMFERENCE = 17.5929  # לגלגל גדול
 WHEEL_BASE = 11.5  # מרחק בין הגלגלים cm
-
-# PID Constants for turning (tune these values for your robot)
-TURN_KP = 2.0
-TURN_KI = 0.0
-TURN_KD = 0.5
-
-# PID Constants for straight driving
-DRIVE_KP = 0.8
-DRIVE_KI = 0.003
-DRIVE_KD = 0.0
+# Distance from wheel axle to robot's center of mass in cm (forward)
+CENTER_OFFSET = -4.0
 
 # Pair the motors connected to ports D (Left) and C (Right) as PAIR_1
 motor_pair.pair(motor_pair.PAIR_1, port.D, port.C)
 
 
-def cm_to_degrees(distance_cm: float) -> float:
-    """
-    Convert distance in centimeters to motor degrees.
-
-    :param distance_cm: Distance in centimeters.
-    :return: Number of motor degrees needed to travel that distance.
-    """
+# ------------------------------------------------------------------------------------------------------------
+# פונקציה שמחזירה כמות מעלות נדרשות בהתאם לכמות הס״מ שהגלגל נסע
+# ------------------------------------------------------------------------------------------------------------
+def cm_to_degrees(distance_cm):
+    # Calculate the number of degrees needed for the given distance
+    # (distance / circumference) * 360 degrees per rotation
     return (abs(distance_cm) / WHEEL_CIRCUMFERENCE) * 360
 
 
-async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
+# ------------------------------------------------------------------------------------------------------------
+# פונקציה לסיבוב הרובוט עם ג׳יירו (ימינה +) (שמאלה-)
+# ------------------------------------------------------------------------------------------------------------
+async def turn_PID(turn_degrees: int):
     """
-    Precise point turn using PID control with gyro feedback.
-
-    Features: Shortest path logic, acceleration ramping, and safety timeout.
-
-    :param turn_degrees: The degrees to turn (e.g., 90, -45, 180). Positive = clockwise.
-    :param speed: Maximum speed (ramping controls actual speed).
+    Advanced PID with Shortest Path Logic, Acceleration Ramping, and Safety Timeout.
+    Executes a precise point turn using a Proportional-Integral (PI) controller with yaw feedback.
+    :param turn_degrees: The degrees needed to turn (e.g., 90, -45, 180 degrees).
+    :param kp: The proportional constant (tune this value, start around 1.0 to 3.0).
+    :param ki: The integral constant (tune this value, start around 0.01 to 0.1).
+    :param Kd: The Diffentail constant (Tune this value, Start around 0.2 to 0.9)
     """
 
     # המתנה 0.05 שניות
@@ -46,10 +40,11 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
     # איפוס ה-Yaw
     motion_sensor.reset_yaw(0)
 
-    # Use module-level PID constants for easier tuning
-    kp = TURN_KP
-    ki = TURN_KI
-    kd = TURN_KD
+    # מקדמי בקרה (דורש כיול בהתאם לרובוט שלך)
+    kp = 2  # Proportional: עוצמת התיקון הבסיסית
+    ki = 0.0  # Integral: תיקון הצטברות שגיאה (עוזר להגיע בדיוק לזווית)
+    kd = 0.5  # Derivative: "בלם" למניעת חריגה מהיעד
+
     # משתני עזר לבקרה
     integral = 0
     last_error = 0
@@ -57,6 +52,7 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
     # מהירות מקסימלית ומינימלית (כדי שהרובוט לא ייתקע או ישתולל)
     max_speed = 100
     min_speed = 5
+    speed = 100
     Correction = 0
     ramp_up_step = 4  # Max speed increase per 10ms (Prevents wheel slip)
     current_out_speed = 0  # Track speed for ramping
@@ -67,8 +63,9 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
     start_time = time.ticks_ms()
     timeout_sec = 5
 
-    # Control loop - לולאת הבקרה
+    # Conrtol loop - לולאת הבקרה
     while True:
+
         # Check Timeout (Safety)
         if (time.ticks_ms() - start_time) > (timeout_sec * 1000):
             print("Turn timed out!")
@@ -76,7 +73,6 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
 
         # Give the sensor a moment to reset
         time.sleep_ms(10)
-
         # קריאת הזווית הנוכחית (המרה מ-decidegrees לדרגות)
         current_yaw = motion_sensor.tilt_angles()[0] / 10
 
@@ -84,18 +80,7 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
         # error = turn_degrees - current_yaw
         error = (turn_degrees - current_yaw + 180) % 360 - 180
 
-        print(
-            "Left Speed:",
-            speed,
-            "Right Speed:",
-            -speed,
-            "Error:",
-            error,
-            "Correction:",
-            Correction,
-            "Yaw:",
-            current_yaw,
-        )
+        # print('Left Speed:', speed, 'Right Speed:', -speed, 'Error:', error, 'Correction:', Correction, 'Yaw:',current_yaw)
 
         # חישוב רכיבי ה-PID
         proportional = error * kp
@@ -146,29 +131,57 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
         else:
             settle_count = 0
 
+        # עדכון השגיאה האחרונה למחזור הבא
+        last_error = error
         await runloop.sleep_ms(10)  # קצב דגימה קבוע של 100Hz
-
-    motor_pair.stop(motor_pair.PAIR_1, stop=motor.BRAKE)  # עצירת התנועה
+    # הדפסת השגיאה הסופית
+    print(
+        "Left Speed:",
+        speed,
+        "Right Speed:",
+        -speed,
+        "Error:",
+        error,
+        "Correction:",
+        Correction,
+        "Yaw:",
+        current_yaw,
+    )
+    motor_pair.stop(motor_pair.PAIR_1)  # עצירת התנועה
     await runloop.sleep_ms(10)  # קצב דגימה קבוע של 100Hz
 
 
-async def move_tank_for_cm(move_cm: float, speed_per: int = 50) -> None:
+# ------------------------------------------------------------------------------------------------------------
+# פונקציה להזזת הרובוט ישר (קדימה +) (אחורה -)
+# ------------------------------------------------------------------------------------------------------------
+async def move_tank_for_cm(move_cm, speed_per=50):
     """
-    Drive the robot a specified distance using gyro-based steering correction.
-
-    :param move_cm: Distance in cm. Positive = forward, negative = backward.
-    :param speed_per: Speed as percentage (0-100%).
+    Drives the robot a specified distance in centimeters using gyro-based correction.
+    Uses a similar approach to turn_pi() for stable, wobble-free straight driving.
+    :param move_cm: The distance to travel in centimeters. Positive for forward, negative for backward.
+    :param speed_per: The speed as a percentage (0 to 100%).
     """
     # המתנה 0.05 שניות
     await runloop.sleep_ms(50)
-
+    start_time = time.ticks_ms()
     # איפוס ה-Yaw לנסיעה ישרה
     motion_sensor.reset_yaw(0)
 
-    # Use module-level PID constants for easier tuning
-    kp = DRIVE_KP
-    ki = DRIVE_KI
-    kd = DRIVE_KD
+    # PID Constants for steering (Gyro)
+    kp = 1.2  # How aggressively it returns to straight
+    ki = 0  # Fixes slow drifts
+    kd = 6.66  # Prevents "fishtailing" (wobbling)
+
+    # PID Calculations parameters:
+    Pc = 0.5  # Oscillation period from previous run
+    Ns = 200  # Number of steps in loop
+    Ts = 400  # Target speed in deg/s (Approx 40% power; SPIKE 3.x uses deg/s)
+    Kc_initial = 2  # Proportional constant Critical value used for the run which gives noticeable oscillation but not really wild ones.
+    # We will call this Kp value “Kc” (“critical gain”).
+
+    # Windup Guard: Limits the power of the Integral term
+    # This prevents the robot from over-correcting after a long drift.
+    integral_limit = 200
 
     # Convert speed percentage to hub velocity
     base_speed = int(speed_per * 10)
@@ -186,12 +199,19 @@ async def move_tank_for_cm(move_cm: float, speed_per: int = 50) -> None:
     # אתחול פרמטרים
     last_error = 0
     integral = 0
+    count = 0  # Count number of loops
+
+    # פרמטרים לשיפור הדיוק
+    decel_kp = 1.2  # מקדם ההאטה - מספר גבוה יותר יעצור מוקדם יותר
+    min_speed = 150  # מהירות מינימלית למניעת עצירה מוקדמת בגלל חיכוך
+    brake_dist = 100  # מרחק (במעלות) שבו מתחילה ההאטה (בערך 22 ס"מ)
+    max_velocity = speed_per * 10
 
     # Control loop - לולאת הבקרה
     while True:
         # Give the sensor a moment
         # time.sleep_ms(10)
-
+        count += 1
         # Check distance traveled (average of both wheels)
         left_pos = abs(motor.relative_position(port.D))
         right_pos = abs(motor.relative_position(port.C))
@@ -199,14 +219,26 @@ async def move_tank_for_cm(move_cm: float, speed_per: int = 50) -> None:
 
         # Stop if we've traveled far enough
         remaining_dist = degrees_to_move - avg_pos
+
         if remaining_dist <= 0:
             break
 
         # Dynamic Speed (Ramp-down)
-        # Slow down as we reach the target for 2025 precision standards
+        # Slow down as we reach the target for precision
+        """
         current_base_speed = base_speed
-        if remaining_dist < 300:  # If less than 300 degrees left
-            current_base_speed = max(100, base_speed * (remaining_dist / 300))
+        if remaining_dist < 400: # If less than 400 degrees left
+            current_base_speed = max(150, base_speed * (remaining_dist / 150))
+        """
+        # 3. פונקציית האטה משופרת (Proportional Ramp Down)
+        # במקום יחס קבוע, אנו מחשבים מהירות מטרה שהולכת וקטנה
+        if remaining_dist < brake_dist:
+            # המהירות היא המרחק שנותר כפול המקדם, אך לא פחות מ-min_speed
+            target_velocity = max(min_speed, remaining_dist * decel_kp)
+            # מוודא שלא נעלה מעל המהירות המקסימלית המקורית
+            current_base_speed = min(max_velocity, target_velocity)
+        else:
+            current_base_speed = max_velocity
 
         # PID Steering Logic
         # Get current yaw - we want to maintain 0 degrees (straight)
@@ -214,12 +246,19 @@ async def move_tank_for_cm(move_cm: float, speed_per: int = 50) -> None:
         current_yaw = motion_sensor.tilt_angles()[0] / 10
 
         # Target yaw is 0 (straight)
-        error = 0 - current_yaw  # We want yaw to be 0
+        error = 0 - current_yaw  # We want yaw to keep heading 0 yaw
 
         p_term = error * kp
         integral += error
-        i_term = integral * ki
         d_term = (error - last_error) * kd
+
+        # Integral with Windup Guard
+        # Only accumulate if we aren't already at max correction
+        if abs(p_term) < 300:
+            integral += error
+        # Clamp the integral to prevent it from growing too large
+        integral = max(min(integral, integral_limit), -integral_limit)
+        i_term = integral * ki
 
         steering_correction = int(p_term + i_term + d_term)
         last_error = error
@@ -230,67 +269,101 @@ async def move_tank_for_cm(move_cm: float, speed_per: int = 50) -> None:
         vel_r = (current_base_speed * direction) - steering_correction
 
         # Debug output
-        print(
-            "Left Vel:",
-            vel_l,
-            "Right Vel:",
-            vel_r,
-            "Yaw:",
-            current_yaw,
-            "Distance:",
-            int(avg_pos),
-            "/",
-            int(degrees_to_move),
-        )
+        # print('Left Vel:', vel_l, 'Right Vel:', vel_r, 'Yaw:', current_yaw, 'Distance:', int(avg_pos), '/', int(degrees_to_move),"Correction: ", steering_correction)
 
         # Drive the motors
         motor_pair.move_tank(motor_pair.PAIR_1, int(vel_l), int(vel_r))
         await runloop.sleep_ms(10)
 
     # Stop with brake
-    motor_pair.stop(motor_pair.PAIR_1, stop=motor.BRAKE)
-    await runloop.sleep_ms(50)
+    motor_pair.stop(motor_pair.PAIR_1, stop=motor.HOLD)
+    # motor_pair.stop(motor_pair.PAIR_1)
+
+    # final movement check
+    print(
+        "Left Vel:",
+        vel_l,
+        "Right Vel:",
+        vel_r,
+        "Yaw:",
+        current_yaw,
+        "Distance:",
+        int(avg_pos),
+        "/",
+        int(degrees_to_move),
+        "Correction: ",
+        steering_correction,
+    )
+
+    # PID Calibration: Kp=0.60 * Kc ; Ki=2 * Kp * dT / Pc ; Kd=Kp * Pc / (8 * dT)
+    # Pc = 0.5 seconds # oscillation period
+    # Kc = 2 # critical gain
+    await runloop.sleep_ms(100)
+    end_time = time.ticks_ms()
+    duration_sec = (end_time - start_time) / 1000
+    print("Loop time: " + str(duration_sec))
+    print("Loop iterations: ", count)
+    print("Time per loop (dT): " + str(duration_sec / 500))
+    end_time = time.ticks_ms()
+    total_time_sec = (end_time - start_time) / 1000
+
+    Kc = Kc_initial
+    dT = total_time_sec / count  # Average time per loop iteration
+
+    # PID Recommendations (Ziegler-Nichols method)
+    Kp_new = 0.60 * Kc
+    Ki_new = 2 * Kp_new * dT / Pc
+    Kd_new = Kp_new * Pc / (8 * dT)
+    print("--- PID TEST RESULTS ---")
+    print("Loop time: ", total_time_sec, "s")
+    print("Loop iterations: ", count)
+    print("Inputs: Kc=", Kc, "; dT= ", dT, "; Pc= ", Pc)
+    print("--- RECOMMENDED PID PARAMS ---")
+    print("Kp= ", Kp_new, "; Ki= ", Ki_new, "; Kd= ", Kd_new)
 
 
+# ------------------------------------------------------------------------------------------------------------
 # פונקציה להזזת המנוע הימני A
+# ------------------------------------------------------------------------------------------------------------
 async def turn_right_arm(degrees_turn: int, speed_per: int):
     # Move Side Motor A backward (-270 degrees)
     fast = int(speed_per * 10)
     await motor.run_for_degrees(port.A, degrees_turn, fast)
 
 
-# פונקציה להזזת המנוע הימני B
+# ------------------------------------------------------------------------------------------------------------
+# פונקציה להזזת המנוע השמאלי B
+# ------------------------------------------------------------------------------------------------------------
 async def turn_left_arm(degrees_turn: int, speed_per: int):
     # Move Side Motor A backward (-270 degrees)
     fast = int(speed_per * 10)
     await motor.run_for_degrees(port.B, degrees_turn, fast)
 
 
-# This is how to write the missions code. After writing the code, run it at the main function.
-async def mission_one_and_two():
+# ------------------------------------------------------------------------------------------------------------
+# Here is where we write the missions code. After writing the code, run it from the main function.
+# ------------------------------------------------------------------------------------------------------------
+# missions 1+2
+# ------------------------------------------------------------------------------------------------------------
+async def mission_one_and_two():  # missions 1+2
     print("--- Starting Mission 1+2 ---")
-    # Move forward 10 cm
-    # await move_tank_for_cm(10, 20)
-    # סיבוב ימינה 90
-    print("Turning Left")
-    await turn_PID(-90, 40)
-
-    print("Turning Right")
-    await turn_PID(90, 40)
-
-    # arm function here...
-    await turn_right_arm(90, 50)
-    await turn_right_arm(-90, 50)
-    await turn_left_arm(-270, 50)
+    await light_matrix.write("1+2")
+    # Move
+    """
+    await turn_PID(90)
+    await turn_PID(-90)
+    """
 
 
-async def mission_three_and_four():
+# ------------------------------------------------------------------------------------------------------------
+# missions 3+4
+# ------------------------------------------------------------------------------------------------------------
+async def mission_three_and_four():  # missions 1+2
     print("--- Starting Mission 3+4 ---")
-    await move_tank_for_cm(-8, 25)
-    await turn_left_arm(-90, 50)
-    await move_tank_for_cm(-3, 25)
-    await turn_left_arm(200, 50)
-    await move_tank_for_cm(11.5, 20)
+    await light_matrix.write("3+4")
+    # Move
+    await turn_PID(90)
+    await turn_PID(-90)
 
 
 async def oscillate_arm(
