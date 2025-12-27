@@ -69,7 +69,6 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
 
     # Control loop - לולאת הבקרה
     while True:
-
         # Check Timeout (Safety)
         if (time.ticks_ms() - start_time) > (timeout_sec * 1000):
             print("Turn timed out!")
@@ -77,6 +76,7 @@ async def turn_PID(turn_degrees: int, speed: int = 100) -> None:
 
         # Give the sensor a moment to reset
         time.sleep_ms(10)
+
         # קריאת הזווית הנוכחית (המרה מ-decidegrees לדרגות)
         current_yaw = motion_sensor.tilt_angles()[0] / 10
 
@@ -293,29 +293,33 @@ async def mission_three_and_four():
     await move_tank_for_cm(11.5, 20)
 
 
-async def oscillate_arm(arm_func, degrees: int, speed: int, count: int) -> None:
+async def oscillate_arm(
+    arm_func, motor_degrees: int, speed: int, count: int = 4
+) -> None:
     """
     Oscillate an arm motor back and forth a specified number of times.
 
     :param arm_func: The arm function to call (turn_right_arm or turn_left_arm).
-    :param degrees: The degrees to move in each direction.
+    :param motor_degrees: The degrees to move in each direction.
     :param speed: The speed percentage (0-100%).
     :param count: Number of oscillation cycles.
     """
     for _ in range(count):
-        await arm_func(degrees, speed)
-        await arm_func(-degrees, speed)
+        await arm_func(-motor_degrees, speed)
+        await arm_func(motor_degrees, speed)
 
 
-async def mission_eight(move_speed: int = 40, turning_speed: int = 50) -> None:
+async def mission_eight(move_speed: int = 40, arm_speed: int = 50) -> None:
     """Mission 8: Move forward, oscillate right arm, return."""
     print("--- Starting Mission 8 ---")
 
-    await move_tank_for_cm(-40, move_speed)
+    # Move forward 37 cm
+    await move_tank_for_cm(-37, move_speed)
 
     # Oscillate right arm 10 times
-    await oscillate_arm(turn_right_arm, 90, turning_speed, 10)
+    await oscillate_arm(turn_right_arm, 70, arm_speed)
 
+    # Move backward 40 cm
     await move_tank_for_cm(40, move_speed)
 
 
