@@ -349,10 +349,22 @@ async def mission_one_and_two():  # missions 1+2
     print("--- Starting Mission 1+2 ---")
     await light_matrix.write("1+2")
     # Move
-    """
+
+    await turn_right_arm(30, 10)
+    await turn_right_arm(-80, 10)
+    await move_tank_for_cm(56)
+    await turn_PID(-45)
+    await move_tank_for_cm(15)
     await turn_PID(90)
-    await turn_PID(-90)
-    """
+
+    await move_tank_for_cm(6, 20)
+    await turn_right_arm(-40, 10)
+    await move_tank_for_cm(6, 20)
+
+    await turn_right_arm(100, 30)
+    await move_tank_for_cm(-17)
+    await turn_PID(-75)
+    await move_tank_for_cm(-90)
 
 
 # ------------------------------------------------------------------------------------------------------------

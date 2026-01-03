@@ -156,13 +156,13 @@ runloop.run(main())
 
 ### Current Missions
 
-| Mission | Function                   | Description                              |
-| ------- | -------------------------- | ---------------------------------------- |
-| 1+2     | `mission_one_and_two()`    | Display "1+2" on light matrix            |
-| 3+4     | `mission_three_and_four()` | Turn 90° right then 90° left             |
-| 5+6     | `mission_five_and_six()`   | Navigation sequence with multiple turns  |
-| 8       | `mission_eight()`          | Move forward, oscillate arm 4x, return   |
-| 10      | `mission_ten()`            | Complex navigation with box manipulation |
+| Mission | Function                   | Description                                                                                                |
+| ------- | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1+2     | `mission_one_and_two()`    | Navigation with arm manipulation: move forward 56cm, turn sequence, use right arm for task, return to base |
+| 3+4     | `mission_three_and_four()` | Turn 90° right then 90° left                                                                               |
+| 5+6     | `mission_five_and_six()`   | Navigation sequence with multiple turns                                                                    |
+| 8       | `mission_eight()`          | Move forward, oscillate arm 4x, return                                                                     |
+| 10      | `mission_ten()`            | Complex navigation with box manipulation                                                                   |
 
 ## Coding Guidelines for AI Agents
 
