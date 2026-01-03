@@ -345,7 +345,7 @@ async def turn_left_arm(degrees_turn: int, speed_per: int):
 # ------------------------------------------------------------------------------------------------------------
 # missions 1+2
 # ------------------------------------------------------------------------------------------------------------
-async def mission_one_and_two():  # missions 1+2
+async def mission_one_and_two():
     print("--- Starting Mission 1+2 ---")
     await light_matrix.write("1+2")
     # Move
@@ -370,7 +370,7 @@ async def mission_one_and_two():  # missions 1+2
 # ------------------------------------------------------------------------------------------------------------
 # missions 3+4
 # ------------------------------------------------------------------------------------------------------------
-async def mission_three_and_four():  # missions 1+2
+async def mission_three_and_four():
     print("--- Starting Mission 3+4 ---")
     await light_matrix.write("3+4")
     # Move
