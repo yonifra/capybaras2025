@@ -8,7 +8,7 @@ This is a **LEGO SPIKE Prime v3.0 robotics project** written in **Python (MicroP
 
 - **Language**: Python (MicroPython for LEGO SPIKE Prime)
 - **Hardware**: LEGO SPIKE Prime Hub
-- **Key Modules**: `hub`, `motor`, `motor_pair`, `runloop`, `motion_sensor`
+- **Key Modules**: `hub`, `motor`, `motor_pair`, `runloop`, `motion_sensor`, `button`, `time`, `math`
 
 ## Project Structure
 
@@ -52,22 +52,23 @@ These constants are tuned for the specific robot and MUST be verified/updated if
 ```python
 WHEEL_CIRCUMFERENCE = 17.5929  # cm - For 56mm diameter wheels (small wheels)
 WHEEL_BASE = 11.5              # cm - Distance between left and right wheels
+CENTER_OFFSET = -4.0           # cm - Distance from wheel axle to robot's center of mass (forward)
 ```
 
 ### 4. **PID Constants**
 
-PID constants are defined at module level for easy tuning:
+PID constants are defined inside the control functions. Here are the current values:
 
 ```python
-# PID Constants for turning
-TURN_KP = 2.0
-TURN_KI = 0.0
-TURN_KD = 0.5
+# PID Constants for turning (inside turn_PID)
+kp = 2      # Proportional
+ki = 0.0    # Integral
+kd = 0.5    # Derivative
 
-# PID Constants for straight driving
-DRIVE_KP = 0.8
-DRIVE_KI = 0.003
-DRIVE_KD = 0.0
+# PID Constants for straight driving (inside move_tank_for_cm)
+kp = 1.2    # How aggressively it returns to straight
+ki = 0      # Fixes slow drifts
+kd = 6.66   # Prevents "fishtailing" (wobbling)
 ```
 
 ## Core Functions Reference
@@ -88,13 +89,12 @@ DRIVE_KD = 0.0
 - **Features**:
   - PID steering correction to maintain straight line
   - Dynamic speed ramp-down near target for precision
-  - Stops with `motor.BRAKE` for accurate stopping
+  - Stops with `motor.HOLD` for accurate stopping
 
-#### `turn_PID(turn_degrees: int, speed: int = 100) -> None`
+#### `turn_PID(turn_degrees: int) -> None`
 
 - Precise point turn using PID control with gyro feedback
 - `turn_degrees`: Angle to turn (positive = clockwise, negative = counter-clockwise)
-- `speed`: Maximum speed (ramping controls actual speed), default 100
 - **Features**:
   - Shortest path logic (always takes the shortest rotation)
   - Acceleration ramping to prevent wheel slip
@@ -116,19 +116,19 @@ DRIVE_KD = 0.0
 - `degrees_turn`: Degrees to rotate (positive/negative for direction)
 - `speed_per`: Speed as percentage (0-100%)
 
-#### `oscillate_arm(arm_func, degrees: int, speed: int, count: int) -> None`
+#### `oscillate_arm(arm_func, motor_degrees: int, speed: int, count: int = 4) -> None`
 
 - Oscillates an arm motor back and forth a specified number of times
 - `arm_func`: The arm function to call (`turn_right_arm` or `turn_left_arm`)
-- `degrees`: Degrees to move in each direction
+- `motor_degrees`: Degrees to move in each direction
 - `speed`: Speed percentage (0-100%)
-- `count`: Number of oscillation cycles
+- `count`: Number of oscillation cycles (default: 4)
 
 **Example:**
 
 ```python
-# Oscillate right arm 10 times at 90 degrees, 50% speed
-await oscillate_arm(turn_right_arm, 90, 50, 10)
+# Oscillate right arm 4 times at 90 degrees, 50% speed
+await oscillate_arm(turn_right_arm, 90, 50, 4)
 ```
 
 ## Mission Structure
@@ -156,12 +156,13 @@ runloop.run(main())
 
 ### Current Missions
 
-| Mission | Function                   | Description                             |
-| ------- | -------------------------- | --------------------------------------- |
-| 1+2     | `mission_one_and_two()`    | Turn left/right, move arms              |
-| 3+4     | `mission_three_and_four()` | Move backward, arm movements            |
-| 8       | `mission_eight()`          | Move forward, oscillate arm 10x, return |
-| 10      | `mission_ten()`            | Navigation sequence with turns          |
+| Mission | Function                   | Description                              |
+| ------- | -------------------------- | ---------------------------------------- |
+| 1+2     | `mission_one_and_two()`    | Display "1+2" on light matrix            |
+| 3+4     | `mission_three_and_four()` | Turn 90° right then 90° left             |
+| 5+6     | `mission_five_and_six()`   | Navigation sequence with multiple turns  |
+| 8       | `mission_eight()`          | Move forward, oscillate arm 4x, return   |
+| 10      | `mission_ten()`            | Complex navigation with box manipulation |
 
 ## Coding Guidelines for AI Agents
 
@@ -308,4 +309,4 @@ When modifying or extending this code:
 
 ---
 
-**Last Updated**: December 2024
+**Last Updated**: January 2026
