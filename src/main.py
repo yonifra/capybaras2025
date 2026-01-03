@@ -420,12 +420,37 @@ async def mission_ten(move_speed=40, turning_speed=40):
     await move_tank_for_cm(70, move_speed)
 
 
+# ------------------------------------------------------------------------------------------------------------
+# missions 5+6
+# ------------------------------------------------------------------------------------------------------------
+async def mission_five_and_six():  # missions 5+6
+    print("--- Starting Mission 5+6 ---")
+    await move_tank_for_cm(45)
+
+    await turn_PID(30)
+
+    await move_tank_for_cm(17)
+
+    await turn_PID(-90)
+
+    await move_tank_for_cm(8)
+
+    await turn_PID(30)
+
+    await move_tank_for_cm(-17)
+
+    await turn_PID(20)
+
+
 async def main():
     # הפעל את משימה 1+2
     await mission_one_and_two()
 
     # הפעל את משימה 3+4
     await mission_three_and_four()
+
+    # הפעל את משימה 5+6
+    await mission_five_and_six()
 
     # הפעל את משימה 8
     await mission_eight()
