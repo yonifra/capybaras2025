@@ -454,6 +454,19 @@ async def mission_five_and_six():  # missions 5+6
     await turn_PID(20)
 
 
+async def mission_nine():  # missions 9
+    print("--- Starting Mission 9 ---")
+
+    await move_tank_for_cm(10)
+    await turn_PID(45)
+    await move_tank_for_cm(45)
+    await move_tank_for_cm(-25)
+    await turn_PID(-20)
+    await move_tank_for_cm(-3)
+    await turn_PID(60)
+    await move_tank_for_cm(-70)
+
+
 async def main():
     # הפעל את משימה 1+2
     await mission_one_and_two()
@@ -466,6 +479,9 @@ async def main():
 
     # הפעל את משימה 8
     await mission_eight()
+
+    # הפעל את משימה 9
+    await mission_nine()
 
     # הפעל את משימה 10
     await mission_ten()
