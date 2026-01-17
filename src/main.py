@@ -1,6 +1,6 @@
 from hub import light_matrix, port, motion_sensor
 import motor, motor_pair, time
-import runloop, sys, math
+import runloop
 
 # Constants - קבועים גלובליים בשימוש
 WHEEL_CIRCUMFERENCE = 17.5929  # לגלגל גדול
