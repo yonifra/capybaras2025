@@ -34,34 +34,58 @@ async def turn_PID(turn_degrees: int):
     :param Kd: The Diffentail constant (Tune this value, Start around 0.2 to 0.9)
     """
 
+    # --- חישוב המלצות Ziegler-Nichols במידה והוזנו ערכי כיול ---
+    # param turn_degrees: מעלות לסיבוב
+    # param ku: הגבר קריטי (נמצא בכיול ידני)
+    # param tu: זמן מחזור בשניות (נמצא בכיול ידני)
+    ku = 0
+    tu = 0
+    if ku > 0 and tu > 0:
+        recommended_kp = 0.6 * ku
+        recommended_ki = 1.2 * ku / tu * 0.02  # מותאם למחזור דגימה של 20ms
+        recommended_kd = 0.075 * ku * tu
+        print("--- ZN Recommendations ---")
+        print(
+            "Kp: ", recommended_kp, ", Ki: ", recommended_ki, ", Kd: ", recommended_kd
+        )
+        kp, ki, kd = recommended_kp, recommended_ki, recommended_kd
+    else:
+        # מקדמי בקרה (דורש כיול בהתאם לרובוט שלך)
+        kp = 3.6  # Proportional: עוצמת התיקון הבסיסית
+        ki = 0.0288  # Integral: תיקון הצטברות שגיאה (עוזר להגיע בדיוק לזווית)
+        kd = 2.25  # Derivative: "בלם" למניעת חריגה מהיעד
+
+    # --- איך לכייל בשיטת Ziegler-Nichols? ---
+    # 1. הגדר ki=0 ו-kd=0.
+    # 2. שנה את kp עד שהרובוט מתנודד סביב המטרה בתנודות קבועות (לא דועכות ולא גדלות).
+    # 3. הערך של ה-kp הזה הוא ה-Ku שלך.
+    # 4. מדוד עם סטופר כמה זמן לוקח לרובוט לבצע 5 תנודות מלאות וחלק ב-5. זה ה-Tu שלך.
+    # 5. הרץ את הפונקציה, ושמור את הפרמטרים בתוך לֹKp, Ki, Kd
+    # ---------סיום הכיול ZN--------------------------
+
     # המתנה 0.05 שניות
     await runloop.sleep_ms(100)
 
     # איפוס ה-Yaw
     motion_sensor.reset_yaw(0)
 
-    # מקדמי בקרה (דורש כיול בהתאם לרובוט שלך)
-    kp = 2  # Proportional: עוצמת התיקון הבסיסית
-    ki = 0.0  # Integral: תיקון הצטברות שגיאה (עוזר להגיע בדיוק לזווית)
-    kd = 0.5  # Derivative: "בלם" למניעת חריגה מהיעד
-
     # משתני עזר לבקרה
     integral = 0
     last_error = 0
 
     # מהירות מקסימלית ומינימלית (כדי שהרובוט לא ייתקע או ישתולל)
-    max_speed = 100
-    min_speed = 5
-    speed = 100
+    max_speed = 200
+    min_speed = 10
+    speed = 200
     Correction = 0
-    ramp_up_step = 4  # Max speed increase per 10ms (Prevents wheel slip)
+    ramp_up_step = 20  # Max speed increase per 10ms (Prevents wheel slip)
     current_out_speed = 0  # Track speed for ramping
     settle_count = 0
 
     # משתני יציבות - מוודא שהרובוט עצר בתוך היעד למשך זמן מסוים
     # settle_time = 0
     start_time = time.ticks_ms()
-    timeout_sec = 5
+    timeout_sec = 3
 
     # Conrtol loop - לולאת הבקרה
     while True:
@@ -124,10 +148,11 @@ async def turn_PID(turn_degrees: int):
         motor_pair.move_tank(motor_pair.PAIR_1, int(-speed), int(speed))
 
         # Exit Conditions
-        if abs(error) < 0.5:
+        if abs(error) < 1:
             settle_count += 1
-            if settle_count > 12:  # Must be stable for 120ms
-                break
+            # if settle_count > 12: # Must be stable for 120ms
+            #    break
+            break
         else:
             settle_count = 0
 
@@ -136,6 +161,7 @@ async def turn_PID(turn_degrees: int):
         await runloop.sleep_ms(10)  # קצב דגימה קבוע של 100Hz
     # הדפסת השגיאה הסופית
     print(
+        "Turning: ",
         "Left Speed:",
         speed,
         "Right Speed:",
@@ -147,7 +173,7 @@ async def turn_PID(turn_degrees: int):
         "Yaw:",
         current_yaw,
     )
-    motor_pair.stop(motor_pair.PAIR_1)  # עצירת התנועה
+    motor_pair.stop(motor_pair.PAIR_1, stop=motor.HOLD)  # עצירת התנועה
     await runloop.sleep_ms(10)  # קצב דגימה קבוע של 100Hz
 
 
@@ -340,6 +366,22 @@ async def turn_left_arm(degrees_turn: int, speed_per: int):
     await motor.run_for_degrees(port.B, degrees_turn, fast)
 
 
+async def oscillate_arm(
+    arm_func, motor_degrees: int, speed: int, count: int = 4
+) -> None:
+    """
+    Oscillate an arm motor back and forth a specified number of times.
+
+    :param arm_func: The arm function to call (turn_right_arm or turn_left_arm).
+    :param motor_degrees: The degrees to move in each direction.
+    :param speed: The speed percentage (0-100%).
+    :param count: Number of oscillation cycles.
+    """
+    for _ in range(count):
+        await arm_func(-motor_degrees, speed)
+        await arm_func(motor_degrees, speed)
+
+
 # ------------------------------------------------------------------------------------------------------------
 # Here is where we write the missions code. After writing the code, run it from the main function.
 # ------------------------------------------------------------------------------------------------------------
@@ -370,66 +412,37 @@ async def mission_one_and_two():
 # ------------------------------------------------------------------------------------------------------------
 # missions 3+4
 # ------------------------------------------------------------------------------------------------------------
-async def mission_three_and_four():
-    print("--- Starting Mission 3+4 ---")
-    await light_matrix.write("3+4")
-    # Move
-    await turn_PID(90)
+async def mission_three_and_four():  # missions 3+4+12
+    # Move to position
+    await move_tank_for_cm(80)
     await turn_PID(-90)
+    await move_tank_for_cm(30)
+    await turn_PID(-35)
+    await move_tank_for_cm(-33)
+    await turn_right_arm(-90, 5)
+    await turn_PID(32)
 
+    # Retrieve the object
+    await move_tank_for_cm(5.5)  # Move Forward
+    await turn_left_arm(-120, 20)  # Open grip
+    await move_tank_for_cm(5)  # move forward
+    await turn_left_arm(120, 20)  # Close grip
+    # Lift arm up
+    await turn_right_arm(90, 7)
+    await runloop.sleep_ms(1000)
+    # Turn arm back down
+    await turn_right_arm(-100, 5)
+    # Move back
+    await move_tank_for_cm(-13.5)
 
-async def oscillate_arm(
-    arm_func, motor_degrees: int, speed: int, count: int = 4
-) -> None:
-    """
-    Oscillate an arm motor back and forth a specified number of times.
-
-    :param arm_func: The arm function to call (turn_right_arm or turn_left_arm).
-    :param motor_degrees: The degrees to move in each direction.
-    :param speed: The speed percentage (0-100%).
-    :param count: Number of oscillation cycles.
-    """
-    for _ in range(count):
-        await arm_func(-motor_degrees, speed)
-        await arm_func(motor_degrees, speed)
-
-
-async def mission_eight(move_speed: int = 40, arm_speed: int = 50) -> None:
-    """Mission 8: Move forward, oscillate right arm, return."""
-    print("--- Starting Mission 8 ---")
-
-    # Move forward 37 cm
-    await move_tank_for_cm(-37, move_speed)
-
-    # Oscillate right arm 10 times
-    await oscillate_arm(turn_right_arm, 70, arm_speed)
-
-    # Move backward 40 cm
-    await move_tank_for_cm(40, move_speed)
-
-
-async def mission_ten(move_speed=40, turning_speed=40):
-    print("--- Starting Mission 10 ---")
-
-    # Move forward 15 cm
-    await move_tank_for_cm(-2, move_speed)
-
-    print("Turning Left")
-    await turn_PID(90, turning_speed)
-
-    # Move forward 15 cm
-    await move_tank_for_cm(-35, move_speed)
-
-    print("Turning right")
-    await turn_PID(-90, turning_speed)
-    # מפיל את הכד ותופס את התיבה
-    await move_tank_for_cm(-3, move_speed)
-    await move_tank_for_cm(3, move_speed)
-
-    # להסתובב אחורה חזרה
-    print("Turning right")
-    await turn_PID(-90, turning_speed)
-    await move_tank_for_cm(70, move_speed)
+    # Lift Statue
+    await turn_PID(-32)
+    await move_tank_for_cm(33)
+    await move_tank_for_cm(1)
+    await turn_right_arm(25, 1)
+    await turn_PID(20)
+    await turn_PID(-35)
+    await turn_left_arm(-120, 20)  # Open grip
 
 
 # ------------------------------------------------------------------------------------------------------------
@@ -454,8 +467,26 @@ async def mission_five_and_six():  # missions 5+6
     await turn_PID(20)
 
 
+async def mission_eight(move_speed: int = 40, arm_speed: int = 50) -> None:
+    """Mission 8: Move forward, oscillate right arm, return."""
+    print("--- Starting Mission 8 ---")
+
+    # Move forward 37 cm
+    await move_tank_for_cm(-37, move_speed)
+
+    # Oscillate right arm 10 times
+    await oscillate_arm(turn_right_arm, 70, arm_speed)
+
+    # Move backward 40 cm
+    await move_tank_for_cm(40, move_speed)
+
+
+# ------------------------------------------------------------------------------------------------------------
+# missions 9
+# ------------------------------------------------------------------------------------------------------------
 async def mission_nine():  # missions 9
     print("--- Starting Mission 9 ---")
+    # await light_matrix.write("9")ֿ
 
     await move_tank_for_cm(10)
     await turn_PID(45)
@@ -465,6 +496,30 @@ async def mission_nine():  # missions 9
     await move_tank_for_cm(-3)
     await turn_PID(60)
     await move_tank_for_cm(-70)
+
+
+async def mission_ten(move_speed=40, turning_speed=40):
+    print("--- Starting Mission 10 ---")
+
+    # Move forward 15 cm
+    await move_tank_for_cm(-2, move_speed)
+
+    print("Turning Left")
+    await turn_PID(90, turning_speed)
+
+    # Move forward 15 cm
+    await move_tank_for_cm(-35, move_speed)
+
+    print("Turning right")
+    await turn_PID(-90, turning_speed)
+    # מפיל את הכד ותופס את התיבה
+    await move_tank_for_cm(-3, move_speed)
+    await move_tank_for_cm(3, move_speed)
+
+    # להסתובב אחורה חזרה
+    print("Turning right")
+    await turn_PID(-90, turning_speed)
+    await move_tank_for_cm(70, move_speed)
 
 
 async def main():
