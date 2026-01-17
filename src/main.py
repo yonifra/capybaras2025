@@ -565,21 +565,42 @@ async def mission_five_and_six():
     Complex path navigation through the competition field.
     """
     print("--- Starting Mission 5+6 ---")
-    await move_tank_for_cm(45)
 
-    await turn_PID(30)
+    await move_tank_for_cm(25)
+
+    await turn_PID(40)
 
     await move_tank_for_cm(17)
 
-    await turn_PID(-90)
+    await turn_PID(-40)
 
-    await move_tank_for_cm(8)
+    await move_tank_for_cm(15)
 
-    await turn_PID(30)
+    await turn_PID(40)
 
-    await move_tank_for_cm(-17)
+    await move_tank_for_cm(4)
 
-    await turn_PID(20)
+    # turning to target
+    await turn_PID(-79)
+
+    await move_tank_for_cm(7)
+
+    await turn_PID(-10)
+
+    await move_tank_for_cm(0.5)
+
+    await turn_PID(15)
+
+    await move_tank_for_cm(-9)
+
+    await turn_PID(35)
+
+    await move_tank_for_cm(11.5)
+
+    await turn_PID(45)
+
+    # Run Back home
+    await move_tank_for_cm(-70)
 
 
 # -----------------------------------------------------------------------------
