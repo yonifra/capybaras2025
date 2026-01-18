@@ -444,28 +444,6 @@ async def turn_left_arm(degrees_turn: int, speed_per: int):
     await motor.run_for_degrees(port.B, degrees_turn, velocity)
 
 
-async def oscillate_arm(
-    arm_func, motor_degrees: int, speed: int, count: int = 4
-) -> None:
-    """
-    Oscillate an arm motor back and forth for repeated actions.
-
-    Useful for tasks like pushing, shaking, or activating mechanisms
-    that require repetitive motion.
-
-    :param arm_func: The arm function to use (turn_right_arm or turn_left_arm)
-    :param motor_degrees: Degrees to move in each direction
-    :param speed: Speed percentage (0-100%)
-    :param count: Number of complete oscillation cycles (default: 4)
-
-    Example:
-        await oscillate_arm(turn_right_arm, 90, 50, 4)  # 4 cycles at 90°
-    """
-    for _ in range(count):
-        await arm_func(-motor_degrees, speed)
-        await arm_func(motor_degrees, speed)
-
-
 # =============================================================================
 # MISSION FUNCTIONS
 # =============================================================================
@@ -604,50 +582,58 @@ async def mission_five_and_six():
 # -----------------------------------------------------------------------------
 # MISSION 8
 # -----------------------------------------------------------------------------
-async def mission_eight(move_speed: int = 40, arm_speed: int = 50) -> None:
-    """
-    Mission 8: Arm oscillation task.
+# async def mission_eight(move_speed: int = 40, arm_speed: int = 50) -> None:
+#     """
+#     Mission 8: Arm oscillation task.
 
-    Actions:
-        1. Move forward to target
-        2. Oscillate arm to complete mechanism activation
-        3. Return to starting position
+#     Actions:
+#         1. Move forward to target
+#         2. Oscillate arm to complete mechanism activation
+#         3. Return to starting position
 
-    :param move_speed: Movement speed percentage (default: 40%)
-    :param arm_speed: Arm movement speed percentage (default: 50%)
-    """
-    print("--- Starting Mission 8 ---")
+#     :param move_speed: Movement speed percentage (default: 40%)
+#     :param arm_speed: Arm movement speed percentage (default: 50%)
+#     """
+#     print("--- Starting Mission 8 ---")
 
-    # Move forward to target position
-    await move_tank_for_cm(-37, move_speed)
+#     # Move forward to target position
+#     await move_tank_for_cm(-37, move_speed)
 
-    # Oscillate right arm (4 cycles at 70 degrees)
-    await oscillate_arm(turn_right_arm, 70, arm_speed)
+#     # Oscillate right arm (4 cycles at 70 degrees)
+#     await oscillate_arm(turn_right_arm, 70, arm_speed)
 
-    # Return to starting position
-    await move_tank_for_cm(40, move_speed)
+#     # Return to starting position
+#     await move_tank_for_cm(40, move_speed)
 
 
 # -----------------------------------------------------------------------------
 # MISSION 9
 # -----------------------------------------------------------------------------
-async def mission_nine():
+async def missions_eight_and_nine():
     """
     Mission 9: Navigation and positioning task.
 
     Complex path with multiple waypoints.
     """
-    print("--- Starting Mission 9 ---")
+    print("--- Starting Missions 8+9 ---")
 
     await move_tank_for_cm(10)
     await turn_PID(40)
     await move_tank_for_cm(45)
-    await move_tank_for_cm(-38)  # Pull back
+    await move_tank_for_cm(-36)  # Pull back
     await move_tank_for_cm(3)
-    await turn_PID(-20)
-    await move_tank_for_cm(-6)
+    await turn_PID(-48)
+    await move_tank_for_cm(6)
+
+    # Oscillate arm for mission 8
+    for i in range(4):
+        await turn_right_arm(-60, 60)
+        await turn_right_arm(60, 60)
+
+    # Move mission 8 Lever
+    await move_tank_for_cm(-17)
     await turn_PID(60)
-    await move_tank_for_cm(-50)
+    await move_tank_for_cm(-30)
 
 
 # -----------------------------------------------------------------------------
@@ -710,10 +696,8 @@ async def main():
     await mission_five_and_six()
 
     # Mission 8: Arm oscillation task
-    await mission_eight()
-
     # Mission 9: Complex navigation
-    await mission_nine()
+    await missions_eight_and_nine()
 
     # Mission 10: Box manipulation
     await mission_ten()
