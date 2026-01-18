@@ -527,8 +527,8 @@ async def mission_three_and_four():
     await move_tank_for_cm(30)
     await turn_PID(-35)
     await move_tank_for_cm(-33)
-    await turn_right_arm(-90, 5)
-    await turn_PID(32)
+    await turn_right_arm(-55, 10)
+    await turn_PID(33)
 
     # --- Phase 2: Retrieve Object ---
     await move_tank_for_cm(5.5)  # Move Forward
@@ -536,22 +536,20 @@ async def mission_three_and_four():
     await move_tank_for_cm(5)  # move forward
     await turn_left_arm(120, 20)  # Close grip
     # Lift arm up
-    await turn_right_arm(90, 7)
+    await turn_right_arm(70, 5)
     await runloop.sleep_ms(1000)
-
     # Turn arm back down
     await turn_right_arm(-100, 5)
-
     # Move back
     await move_tank_for_cm(-13.5)
 
     # --- Phase 3: Lift Statue ---
-    await turn_PID(-32)
-    await move_tank_for_cm(33)
-    await move_tank_for_cm(1)
-    await turn_right_arm(25, 1)
+    await turn_PID(-33)
+    await move_tank_for_cm(35)
+    await turn_right_arm(27, 1)
     await turn_PID(20)
-    await turn_PID(-35)
+    await move_tank_for_cm(-3)
+    await turn_PID(-30)
     await turn_left_arm(-120, 20)  # Open grip
 
 
@@ -642,13 +640,14 @@ async def mission_nine():
     print("--- Starting Mission 9 ---")
 
     await move_tank_for_cm(10)
-    await turn_PID(45)
+    await turn_PID(40)
     await move_tank_for_cm(45)
-    await move_tank_for_cm(-25)
+    await move_tank_for_cm(-38)  # Pull back
+    await move_tank_for_cm(3)
     await turn_PID(-20)
-    await move_tank_for_cm(-3)
+    await move_tank_for_cm(-6)
     await turn_PID(60)
-    await move_tank_for_cm(-70)
+    await move_tank_for_cm(-50)
 
 
 # -----------------------------------------------------------------------------
