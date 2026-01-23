@@ -710,9 +710,10 @@ async def main():
     # Mission 9: Complex navigation
     await missions_eight_and_nine()
 
-    # Mission 10: Box manipulation
+    # Missions 10+11: Box manipulation
     await missions_ten_and_eleven()
 
+    # Mission 12
     await mission_twelve()
 
 
