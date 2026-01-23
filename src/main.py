@@ -674,6 +674,12 @@ async def mission_ten(move_speed=40, turning_speed=40):
     await move_tank_for_cm(70, move_speed)
 
 
+async def mission_twelve():
+    print("--- Starting Mission 12 ---")
+    await move_tank_for_cm(50)
+    await move_tank_for_cm(-60)
+
+
 # =============================================================================
 # MAIN PROGRAM ENTRY POINT
 # =============================================================================
@@ -701,6 +707,8 @@ async def main():
 
     # Mission 10: Box manipulation
     await mission_ten()
+
+    await mission_twelve()
 
 
 # Start the robot program
