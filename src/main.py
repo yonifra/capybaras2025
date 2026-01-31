@@ -641,7 +641,7 @@ async def missions_eight_and_nine():
 # -----------------------------------------------------------------------------
 async def missions_ten_and_eleven(move_speed=40, turning_speed=40):
     """
-    Missions 10 + 11: Box manipulation task.
+    Mission 10+11: Box manipulation task.
 
     Actions:
         1. Navigate to jar/box location
@@ -651,10 +651,10 @@ async def missions_ten_and_eleven(move_speed=40, turning_speed=40):
     :param move_speed: Movement speed percentage (default: 40%)
     :param turning_speed: Turning speed (currently unused - uses turn_PID)
     """
-    print("--- Starting Missions 10 + 11 ---")
+    print("--- Starting Missions 10+11 ---")
 
     # --- Phase 1: Navigate to Target ---
-    await move_tank_for_cm(25)
+    await move_tank_for_cm(22)
 
     print("Turning Left")
     await turn_PID(85)
@@ -662,21 +662,28 @@ async def missions_ten_and_eleven(move_speed=40, turning_speed=40):
     await move_tank_for_cm(57)
 
     print("Turning right")
-    await turn_PID(-95)
+    await turn_PID(-90)
 
     # --- Phase 2: Knock Over Jar and Grab Box ---
-    await move_tank_for_cm(10)  # Push forward
-    await move_tank_for_cm(-8)  # Pull back
+    await move_tank_for_cm(13)  # Push forward
+    await move_tank_for_cm(-10)  # Pull back
 
     # --- Phase 3: Return to Base ---
     print("Turning right")
-    await turn_PID(115)
+    await turn_PID(91)
 
-    # await move_tank_for_cm(-70)
+    await move_tank_for_cm(3)
+    await turn_PID(10)
 
-    for i in range(8):
-        await move_tank_for_cm(-9)
-        await move_tank_for_cm(9)
+    for i in range(4):
+        await move_tank_for_cm(7)
+        await move_tank_for_cm(-7)
+
+    # RETURN HOME
+    await turn_PID(-40)
+    await move_tank_for_cm(30)
+    await turn_PID(35)
+    await move_tank_for_cm(80)
 
 
 async def mission_twelve():
