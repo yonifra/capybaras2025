@@ -506,15 +506,15 @@ async def mission_three_and_four():
     await turn_PID(-35)
     await move_tank_for_cm(-33)
     await turn_right_arm(-55, 10)
-    await turn_PID(33)
+    await turn_PID(31)
 
     # --- Phase 2: Retrieve Object ---
-    await move_tank_for_cm(5.5)  # Move Forward
+    await move_tank_for_cm(5)  # Move Forward
     await turn_left_arm(-120, 20)  # Open grip
-    await move_tank_for_cm(5)  # move forward
+    await move_tank_for_cm(5.5)  # move forward
     await turn_left_arm(120, 20)  # Close grip
     # Lift arm up
-    await turn_right_arm(70, 5)
+    await turn_right_arm(70, 20)
     await runloop.sleep_ms(1000)
     # Turn arm back down
     await turn_right_arm(-100, 5)
@@ -522,10 +522,11 @@ async def mission_three_and_four():
     await move_tank_for_cm(-13.5)
 
     # --- Phase 3: Lift Statue ---
-    await turn_PID(-33)
+    await turn_PID(-32.5)
     await move_tank_for_cm(35)
-    await turn_right_arm(27, 1)
-    await turn_PID(20)
+    await runloop.sleep_ms(500)
+    await turn_right_arm(60, 50)
+    await turn_PID(21)
     await move_tank_for_cm(-3)
     await turn_PID(-30)
     await turn_left_arm(-120, 20)  # Open grip
@@ -634,6 +635,56 @@ async def missions_eight_and_nine():
     await move_tank_for_cm(-17)
     await turn_PID(60)
     await move_tank_for_cm(-30)
+
+
+# -----------------------------------------------------------------------------
+# MISSION 10 - Yair's version
+# -----------------------------------------------------------------------------
+async def mission_ten(move_speed=40, turning_speed=40):
+    """
+    Mission 10: Box manipulation task.
+
+    Actions:
+        1. Navigate to jar/box location
+        2. Knock over jar and grab box
+        3. Return to base
+
+    :param move_speed: Movement speed percentage (default: 40%)
+    :param turning_speed: Turning speed (currently unused - uses turn_PID)
+    """
+    print("--- Starting Mission 10 ---")
+
+    # --- Phase 1: Navigate to Target ---
+    await move_tank_for_cm(22)
+
+    print("Turning Left")
+    await turn_PID(85)
+
+    await move_tank_for_cm(57)
+
+    print("Turning right")
+    await turn_PID(-90)
+
+    # --- Phase 2: Knock Over Jar and Grab Box ---
+    await move_tank_for_cm(13)  # Push forward
+    await move_tank_for_cm(-10)  # Pull back
+
+    # --- Phase 3: Return to Base ---
+    print("Turning right")
+    await turn_PID(91)
+
+    await move_tank_for_cm(3)
+    await turn_PID(10)
+
+    for i in range(4):
+        await move_tank_for_cm(7)
+        await move_tank_for_cm(-7)
+
+    # RETURN HOME
+    await turn_PID(-40)
+    await move_tank_for_cm(30)
+    await turn_PID(35)
+    await move_tank_for_cm(80)
 
 
 # -----------------------------------------------------------------------------
